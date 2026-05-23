@@ -1,0 +1,43 @@
+{
+  "name": "@ppradyoth/synaptic-wetware-engine",
+  "version": "1.0.0",
+  "description": "Pure mathematical simulation models (Hodgkin-Huxley, Izhikevich) and neural analytics (MaxInterval burst detection) for Organoid Intelligence biocomputing.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ppradyoth/synaptic-wetware.git",
+    "directory": "packages/engine"
+  },
+  "keywords": [
+    "neuroscience",
+    "organoid-intelligence",
+    "biocomputing",
+    "hodgkin-huxley",
+    "izhikevich",
+    "burst-detection",
+    "mea"
+  ],
+  "author": "Pradyoth P (https://github.com/ppradyoth)",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
