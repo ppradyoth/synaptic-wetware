@@ -18,6 +18,7 @@ export const ElectrophysiologyGrid: React.FC<ElectrophysiologyGridProps> = ({
   burstMetrics,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rasterCanvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedElectrode, setSelectedElectrode] = useState<Electrode | null>(null);
 
   // Active spike visualization counter
@@ -118,6 +119,87 @@ export const ElectrophysiologyGrid: React.FC<ElectrophysiologyGridProps> = ({
       cancelAnimationFrame(animationId);
     };
   }, [electrodes]);
+
+  // ── Spike Raster Plot ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = rasterCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const NUM_CH = 64;
+    const TIME_WINDOW = 4000; // ms
+    const PADDING_LEFT = 28;  // space for Y labels
+    const PADDING_BOTTOM = 18; // space for X labels
+    const plotW = W - PADDING_LEFT;
+    const plotH = H - PADDING_BOTTOM;
+    const rowH = plotH / NUM_CH;
+
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Horizontal gridlines every 8 electrodes
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for (let ch = 0; ch <= NUM_CH; ch += 8) {
+      const y = Math.round(PADDING_BOTTOM / 2 + (ch / NUM_CH) * plotH);
+      ctx.beginPath();
+      ctx.moveTo(PADDING_LEFT, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+
+    // Draw spike ticks
+    rasterEvents.forEach((ev) => {
+      // Map time: newest at right (x = W), oldest at PADDING_LEFT
+      // ev.t is 0-4000ms within the 4s window per the interface
+      const xFrac = ev.t / TIME_WINDOW; // 0 = oldest, 1 = newest
+      const x = PADDING_LEFT + xFrac * plotW;
+      const y = Math.round(PADDING_BOTTOM / 2 + (ev.electrodeId / NUM_CH) * plotH);
+
+      // Determine color by electrode ID role mapping
+      // input-a: id mapped from x=0,y=2 → id = 0*8+2 = 2
+      // input-b: id mapped from x=0,y=5 → id = 0*8+5 = 5
+      // motor-up: x=7,y=1 → id = 7*8+1 = 57
+      // motor-down: x=7,y=6 → id = 7*8+6 = 62
+      let color: string;
+      if (ev.electrodeId === 2 || ev.electrodeId === 5) {
+        color = 'rgba(0,240,255,0.6)';   // cyan – input
+      } else if (ev.electrodeId === 57 || ev.electrodeId === 62) {
+        color = 'rgba(255,191,0,0.6)';   // amber – motor
+      } else {
+        color = 'rgba(0,255,127,0.6)';   // green – interneuron
+      }
+
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), y - 1, 1, Math.ceil(rowH < 2.5 ? 2.5 : rowH * 0.8));
+    });
+
+    // Y axis labels
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.textAlign = 'right';
+    const yLabels: Array<{ ch: number; label: string }> = [
+      { ch: 0,  label: 'Ch 0'  },
+      { ch: 32, label: 'Ch 32' },
+      { ch: 63, label: 'Ch 63' },
+    ];
+    yLabels.forEach(({ ch, label }) => {
+      const y = Math.round(PADDING_BOTTOM / 2 + (ch / NUM_CH) * plotH);
+      ctx.fillText(label, PADDING_LEFT - 2, y + 3);
+    });
+
+    // X axis labels
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.font = '9px JetBrains Mono, monospace';
+    ctx.fillText('-4s', PADDING_LEFT, H - 3);
+    ctx.textAlign = 'right';
+    ctx.fillText('Now', W, H - 3);
+  }, [rasterEvents]);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', height: '100%' }}>
@@ -286,6 +368,44 @@ export const ElectrophysiologyGrid: React.FC<ElectrophysiologyGridProps> = ({
               borderRadius: '8px',
               border: '1px solid rgba(255,255,255,0.05)',
               display: 'block'
+            }}
+          />
+        </div>
+
+        {/* Spike Raster Plot Panel */}
+        <div className="glass-panel" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.03em' }}>
+              Spike Raster (64ch · 4s window)
+            </span>
+            {/* Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {([
+                { color: '#00f0ff', label: 'Input' },
+                { color: '#ffbf00', label: 'Motor' },
+                { color: '#00ff7f', label: 'Intern.' },
+              ] as const).map(({ color, label }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: color, opacity: 0.8 }} />
+                  <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Raster canvas */}
+          <canvas
+            ref={rasterCanvasRef}
+            width={300}
+            height={180}
+            style={{
+              width: '100%',
+              height: '180px',
+              background: 'rgba(0,0,0,0.3)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255,255,255,0.05)',
+              display: 'block',
             }}
           />
         </div>

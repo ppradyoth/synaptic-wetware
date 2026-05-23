@@ -22,8 +22,11 @@ export const GrowRoom: React.FC<GrowRoomProps> = ({
   addLog
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const spheroidCanvasRef = useRef<HTMLCanvasElement>(null);
   const [growthPaths, setGrowthPaths] = useState<GrowthPath[]>([]);
   const [isGrowing, setIsGrowing] = useState(false);
+  const calciumWavesRef = useRef<Array<{ x: number; y: number; r: number; alpha: number; maxR: number }>>([]);
+  const spheroidAnimRef = useRef<number>(0);
 
   // Trigger biological growth surge (NGF Perfusion)
   const triggerGrowthSurge = () => {
@@ -62,7 +65,105 @@ export const GrowRoom: React.FC<GrowRoomProps> = ({
     seedStemCells();
     setGrowthPaths([]);
     setIsGrowing(true);
+    calciumWavesRef.current = [];
   };
+
+  // ── 3D Spheroid + Calcium Wave Canvas ────────────────────────
+  useEffect(() => {
+    const canvas = spheroidCanvasRef.current;
+    if (!canvas) return;
+    canvas.width  = 220;
+    canvas.height = 220;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const cx = 110, cy = 110;
+    const baseR = 72 * Math.min(1, vitals.cellCount / 400000);
+
+    // Spawn calcium waves when network is active
+    if (vitals.synapticDensity > 200 && Math.random() > 0.88) {
+      const angle = Math.random() * Math.PI * 2;
+      const spawnR = baseR * (0.3 + Math.random() * 0.6);
+      calciumWavesRef.current.push({
+        x: cx + Math.cos(angle) * spawnR,
+        y: cy + Math.sin(angle) * spawnR,
+        r: 0, alpha: 0.7,
+        maxR: 30 + Math.random() * 25,
+      });
+    }
+
+    const drawSpheroid = () => {
+      ctx.clearRect(0, 0, 220, 220);
+
+      if (vitals.cellCount < 5000) return;
+
+      // ── Cortical layers (back → front) ──────────────────────
+      const layers = [
+        { rScale: 1.00, color: [10, 60, 40],   label: 'VZ' },
+        { rScale: 0.82, color: [0, 100, 70],   label: 'SVZ' },
+        { rScale: 0.63, color: [0, 160, 100],  label: 'CP' },
+        { rScale: 0.42, color: [0, 220, 140],  label: 'MZ' },
+      ];
+
+      layers.forEach(layer => {
+        const r = baseR * layer.rScale;
+        const [r0, g0, b0] = layer.color;
+        const viab = vitals.viability / 100;
+        const grd = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.05, cx, cy, r);
+        grd.addColorStop(0, `rgba(${Math.round(r0 * 1.5 * viab)},${Math.round(g0 * 1.5 * viab)},${Math.round(b0 * 1.5 * viab)},0.65)`);
+        grd.addColorStop(0.7, `rgba(${Math.round(r0 * viab)},${Math.round(g0 * viab)},${Math.round(b0 * viab)},0.45)`);
+        grd.addColorStop(1,   `rgba(${Math.round(r0 * 0.3 * viab)},${Math.round(g0 * 0.3 * viab)},${Math.round(b0 * 0.3 * viab)},0.15)`);
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, r, r * 0.92, -0.2, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
+        ctx.fill();
+      });
+
+      // ── Specular highlight ──────────────────────────────────
+      const spec = ctx.createRadialGradient(cx - baseR * 0.3, cy - baseR * 0.35, 1, cx - baseR * 0.2, cy - baseR * 0.25, baseR * 0.5);
+      spec.addColorStop(0, 'rgba(255,255,255,0.18)');
+      spec.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, baseR, baseR * 0.92, -0.2, 0, Math.PI * 2);
+      ctx.fillStyle = spec;
+      ctx.fill();
+
+      // ── Calcium wave ripples (simulated GCaMP fluorescence) ─
+      calciumWavesRef.current = calciumWavesRef.current.filter(w => w.alpha > 0.03);
+      calciumWavesRef.current.forEach(wave => {
+        wave.r   += 1.4;
+        wave.alpha *= 0.93;
+        ctx.beginPath();
+        ctx.arc(wave.x, wave.y, wave.r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0,255,200,${wave.alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+
+      // ── Layer labels ────────────────────────────────────────
+      if (vitals.synapticDensity > 100) {
+        ctx.font = '7px JetBrains Mono, monospace';
+        ctx.fillStyle = 'rgba(0,255,127,0.5)';
+        ctx.textAlign = 'right';
+        layers.forEach((l, i) => {
+          const lr = baseR * l.rScale;
+          ctx.fillText(l.label, cx - lr * 0.72, cy + i * 10 - 14);
+        });
+      }
+
+      // ── Outline rim ─────────────────────────────────────────
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, baseR, baseR * 0.92, -0.2, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,255,127,0.18)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      spheroidAnimRef.current = requestAnimationFrame(drawSpheroid);
+    };
+
+    drawSpheroid();
+    return () => cancelAnimationFrame(spheroidAnimRef.current);
+  }, [vitals]);
 
   // Biological Growth Canvas Engine
   useEffect(() => {
@@ -354,39 +455,74 @@ export const GrowRoom: React.FC<GrowRoomProps> = ({
       </div>
 
       {/* Growth Render viewport */}
-      <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.05)', position: 'relative' }}>
+      <div className="glass-panel" style={{ overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', display: 'flex' }}>
+        {/* Main axon pathfinding canvas */}
         <canvas
           ref={canvasRef}
-          style={{
-            display: 'block',
-            width: '100%',
-            height: '420px',
-            background: 'var(--bg-dark)'
-          }}
+          style={{ display: 'block', flex: 1, height: '360px', background: 'var(--bg-dark)' }}
         />
 
-        {/* Dynamic Growth Overlay Overlay */}
+        {/* Right side: 3D spheroid + maturation timeline */}
+        <div style={{ width: '240px', flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.25)' }}>
+          {/* Spheroid canvas */}
+          <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'rgba(0,255,127,0.5)', fontWeight: 700, letterSpacing: '0.5px' }}>3D Cortical Spheroid</span>
+            <canvas
+              ref={spheroidCanvasRef}
+              width={220} height={220}
+              style={{ width: '200px', height: '200px', borderRadius: '50%' }}
+            />
+            <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>GCaMP fluorescence · {vitals.cellCount.toLocaleString()} cells</span>
+          </div>
+
+          {/* Maturation Timeline */}
+          <div style={{ flex: 1, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.04)', overflowY: 'auto' }}>
+            <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>Maturation Timeline</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0', marginTop: '8px' }}>
+              {[
+                { day: 0,   label: 'iPSC Seeding',          done: true },
+                { day: 7,   label: 'Neural Rosette',         done: vitals.cellCount > 50000 },
+                { day: 14,  label: 'VZ/SVZ Patterning',      done: vitals.synapticDensity > 20 },
+                { day: 30,  label: 'Cortical Neuron Emergence', done: vitals.synapticDensity > 80 },
+                { day: 60,  label: 'Spontaneous Activity',   done: vitals.synapticDensity > 500 },
+                { day: 90,  label: 'Network Bursting',        done: vitals.synapticDensity > 1500 },
+                { day: 120, label: 'Mature Organoid',         done: vitals.myelination > 40 },
+              ].map((m, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '16px', flexShrink: 0 }}>
+                    <div style={{
+                      width: '10px', height: '10px', borderRadius: '50%', marginTop: '2px', flexShrink: 0,
+                      background: m.done ? 'var(--accent-green)' : 'rgba(255,255,255,0.1)',
+                      boxShadow: m.done ? '0 0 6px var(--accent-green)' : 'none',
+                      border: m.done ? 'none' : '1px solid rgba(255,255,255,0.15)',
+                    }} />
+                    {i < 6 && <div style={{ width: '1px', height: '22px', background: m.done ? 'rgba(0,255,127,0.2)' : 'rgba(255,255,255,0.05)' }} />}
+                  </div>
+                  <div style={{ paddingBottom: '12px' }}>
+                    <div style={{ fontSize: '0.62rem', fontWeight: 700, color: m.done ? '#fff' : 'rgba(255,255,255,0.3)' }}>{m.label}</div>
+                    <div style={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-mono)' }}>Day {m.day}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Growth telemetry overlay */}
         <div style={{
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-          background: 'rgba(5, 10, 14, 0.75)',
-          backdropFilter: 'blur(8px)',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderRadius: '8px',
-          padding: '12px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-          pointerEvents: 'none'
+          position: 'absolute', top: '12px', left: '12px',
+          background: 'rgba(5,10,14,0.75)', backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px',
+          padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '5px',
+          pointerEvents: 'none',
         }}>
-          <span style={{ fontSize: '0.65rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <TrendingUp size={10} style={{ color: 'var(--accent-cyan)' }} /> Growth Telemetry
+          <span style={{ fontSize: '0.6rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <TrendingUp size={9} style={{ color: 'var(--accent-cyan)' }} /> Growth Telemetry
           </span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-            <div>GROWTH MODE: <span style={{ color: isGrowing ? 'var(--accent-green)' : 'rgba(255,255,255,0.4)' }}>{isGrowing ? 'SPILE PATHFINDING' : 'IDLE'}</span></div>
-            <div>ACTIVE GROWTH CONES: <span style={{ color: 'var(--accent-cyan)' }}>{growthPaths.filter(p => p.active).length} nodes</span></div>
-            <div>STEM CELL DIVISION: <span style={{ color: 'var(--accent-green)' }}>{(vitals.viability > 90 ? 'OPTIMAL' : vitals.viability > 70 ? 'STABLE' : 'STUNTED')}</span></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.7rem', fontFamily: 'var(--font-mono)' }}>
+            <div>MODE: <span style={{ color: isGrowing ? 'var(--accent-green)' : 'rgba(255,255,255,0.4)' }}>{isGrowing ? 'AXON PATHFINDING' : 'IDLE'}</span></div>
+            <div>CONES: <span style={{ color: 'var(--accent-cyan)' }}>{growthPaths.filter(p => p.active).length}</span></div>
+            <div>DIVISION: <span style={{ color: 'var(--accent-green)' }}>{vitals.viability > 90 ? 'OPTIMAL' : vitals.viability > 70 ? 'STABLE' : 'STUNTED'}</span></div>
           </div>
         </div>
       </div>
