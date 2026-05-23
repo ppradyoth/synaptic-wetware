@@ -14,7 +14,7 @@ export interface Electrode {
   lastSpikeTime: number;
 }
 
-export type TaskType = 'logic' | 'pong' | 'waveform';
+export type TaskType = 'logic' | 'pong' | 'waveform' | 'braille';
 
 export interface PongState {
   ballX: number; ballY: number;

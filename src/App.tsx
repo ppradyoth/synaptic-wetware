@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { useWetwareSim } from './hooks/useWetwareSim';
 import { GrowRoom } from './components/GrowRoom';
 import { ElectrophysiologyGrid } from './components/ElectrophysiologyGrid';
+import { ConnectomeGraph } from './components/ConnectomeGraph';
 import { TrainingPlayground } from './components/TrainingPlayground';
 import { IncubatorControls } from './components/IncubatorControls';
 import { Benchmarks } from './components/Benchmarks';
 import { About } from './components/About';
 import { EthicsPanel } from './components/EthicsPanel';
+import { ExportPanel } from './components/ExportPanel';
 
 import {
   Sprout, Zap, Brain, Thermometer, BarChart,
   Activity, Shield, Clock, RefreshCw, BookOpen,
-  FlaskConical, Cpu
+  FlaskConical, Cpu, Download, Share2
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -24,7 +26,8 @@ export const App: React.FC = () => {
     setActiveTask, setLogicGate, addLog,
   } = useWetwareSim();
 
-  const [activeTab, setActiveTab] = useState<'grow' | 'mea' | 'training' | 'incubator' | 'benchmarks' | 'about'>('grow');
+  const [activeTab, setActiveTab] = useState<'grow' | 'mea' | 'connectome' | 'training' | 'incubator' | 'benchmarks' | 'about'>('grow');
+  const [showExport, setShowExport] = useState(false);
 
   const isEmergency = vitals.viability < 80 || vitals.isStarving;
   const isHealthy   = vitals.viability >= 90;
@@ -179,6 +182,7 @@ export const App: React.FC = () => {
           </span>
           <button onClick={() => setActiveTab('grow')}       style={navBtn('grow',       'var(--accent-green)')}><Sprout    size={16} /> Stem-Cell Grow Room</button>
           <button onClick={() => setActiveTab('mea')}        style={navBtn('mea',        'var(--accent-cyan)')}><Zap       size={16} /> Electrophysiology MEA</button>
+          <button onClick={() => setActiveTab('connectome')} style={navBtn('connectome', 'var(--accent-cyan)')}><Share2    size={16} /> Functional Connectome</button>
           <button onClick={() => setActiveTab('training')}   style={navBtn('training',   'var(--accent-cyan)')}><Brain     size={16} /> Cognitive Conditioning</button>
           <button onClick={() => setActiveTab('incubator')}  style={navBtn('incubator',  'var(--accent-green)')}><Thermometer size={16} /> Incubator Environment</button>
           <button onClick={() => setActiveTab('benchmarks')} style={navBtn('benchmarks', '#fff')}><BarChart  size={16} /> Silicon vs Biotech</button>
@@ -224,11 +228,29 @@ export const App: React.FC = () => {
               <Clock size={11} /> Live telemetry: 100ms · Model: <strong style={{ color: modelType === 'izhikevich' ? 'var(--accent-cyan)' : '#c084fc' }}>{modelType === 'izhikevich' ? 'Izhikevich' : 'Hodgkin-Huxley'}</strong>
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-green)', boxShadow: '0 0 6px var(--accent-green)' }} />
-            <span className="font-telemetry" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', fontWeight: 600 }}>
-              MEA {burstMetrics.networkBursting ? '🔴 BURST ACTIVE' : '🟢 NOMINAL'}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-green)', boxShadow: '0 0 6px var(--accent-green)' }} />
+              <span className="font-telemetry" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', fontWeight: 600 }}>
+                MEA {burstMetrics.networkBursting ? '🔴 BURST ACTIVE' : '🟢 NOMINAL'}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowExport(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '6px 12px', borderRadius: '8px',
+                background: 'rgba(0,240,255,0.08)',
+                border: '1px solid rgba(0,240,255,0.18)',
+                color: 'var(--accent-cyan)', cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 700,
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,240,255,0.16)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0,240,255,0.08)')}
+            >
+              <Download size={12} /> Export Data
+            </button>
           </div>
         </header>
 
@@ -246,6 +268,9 @@ export const App: React.FC = () => {
               burstMetrics={burstMetrics}
             />
           )}
+          {activeTab === 'connectome' && (
+            <ConnectomeGraph electrodes={electrodes} />
+          )}
           {activeTab === 'training' && (
             <TrainingPlayground
               activeTask={activeTask} setActiveTask={setActiveTask}
@@ -261,6 +286,19 @@ export const App: React.FC = () => {
           {activeTab === 'about'      && <About />}
         </div>
       </main>
+
+      {/* ── EXPORT PANEL ─────────────────────────────────────────── */}
+      {showExport && (
+        <ExportPanel
+          vitals={vitals}
+          burstMetrics={burstMetrics}
+          ethicsMetrics={ethicsMetrics}
+          electrodes={electrodes}
+          rasterEvents={rasterEvents}
+          modelType={modelType}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </div>
   );
 };
