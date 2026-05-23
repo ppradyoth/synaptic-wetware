@@ -205,4 +205,4 @@ All of these are freely accessible:
 ---
 
 *This explainer was written to accompany the Synaptic Wetware open-source simulator.*  
-*Built by [Antigravity](https://github.com/ppradyoth) — an AI coding assistant by Google DeepMind.*
+*Built by [@ppradyoth](https://github.com/ppradyoth) with the assistance of Antigravity — an AI coding assistant by Google DeepMind.*

@@ -151,9 +151,8 @@ EXPLAINER.md                    # Deep-dive guide for fresh grads
 
 ## Credits
 
-**Conceived, researched, and built by [Antigravity](https://github.com/ppradyoth)** — an agentic AI coding assistant by the Google DeepMind Advanced Agentic Coding team.
+**Conceived, researched, and built by [@ppradyoth](https://github.com/ppradyoth)** — with the assistance of Antigravity, an agentic AI coding assistant by the Google DeepMind Advanced Agentic Coding team.
 
-Built for [@ppradyoth](https://github.com/ppradyoth).
 
 ---
 
