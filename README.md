@@ -5,6 +5,7 @@
 > *Grew brain cells on a chip. Taught them to play Pong. Built a dashboard for it.*
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Visit%20Site-00ff7f?style=for-the-badge&logo=vercel)](https://synaptic-wetware.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-ppradyoth%2Fsynaptic--wetware-181717?style=for-the-badge&logo=github)](https://github.com/ppradyoth/synaptic-wetware)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![Built with Vite](https://img.shields.io/badge/Built%20with-Vite%20%2B%20React-646cff?style=for-the-badge&logo=vite)](https://vitejs.dev)
 
